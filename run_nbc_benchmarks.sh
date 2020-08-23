@@ -17,6 +17,9 @@ BENCHMARKS=()
 if [[ -f "research/block_sim.nim" ]]; then
 	BENCHMARKS+=( block_sim )
 fi
+if [[ -f "research/state_sim.nim" ]]; then
+	BENCHMARKS+=( state_sim )
+fi
 
 make -j${NPROC} ${BENCHMARKS[*]}
 

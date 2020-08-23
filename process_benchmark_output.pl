@@ -73,6 +73,43 @@ if ($bench_type eq 'block_sim') {
             push(@{$group{'tests'}}, \%test);
         }
     }
+} elsif ($bench_type eq 'state_sim') {
+    my $start_processing = 0;
+    my $validators = 0;
+    my $epoch_length = 0;
+    while (<$input_handle>) {
+        # strip both ends
+        s/^\s+|\s+$//;
+
+        $start_processing = 1 if /^:Done!$/;
+        next if not $start_processing;
+
+        if (/^Validators: (\d+), epoch length: (\d+)$/) {
+            ($validators, $epoch_length) = ($1, $2);
+        } elsif (/^(\d+\.\d+),\s+(\d+\.\d+),\s+(\d+\.\d+),\s+(\d+\.\d+),\s+(\d+), (.+)$/) {
+            my ($average, $stddev, $min, $max, $samples, $test_name) = ($1, $2, $3, $4, $5, $6);
+            my %test = (
+                name => $test_name,
+            );
+            @{$test{'parameters'}} = (
+                {
+                    name => 'validators',
+                    value => $validators * 1,
+                },
+                {
+                    name => 'epoch length',
+                    value => $epoch_length * 1,
+                },
+            );
+            @{$test{'results'}} = (
+                {
+                    name => 'average',
+                    value => $average * 1,
+                },
+            );
+            push(@{$group{'tests'}}, \%test);
+        }
+    }
 } else {
     die "Unknown benchmark type: $bench_type";
 }
