@@ -1,0 +1,146 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>Nimbus-eth2 %BENCH_NAME% benchmarks</title>
+        <script src="http://d3js.org/d3.v4.min.js"></script>
+        <script src="http://dimplejs.org/dist/dimple.v2.3.0.min.js"></script>
+        <!-- Getting around CORS restrictions. -->
+        <script src="%BENCH_NAME%_d3.js"></script>
+    </head>
+    <body>
+        <h2 align="center">Nimbus-eth2 %BENCH_NAME% benchmarks</h2>
+        <div id="chartContainer" align="center"></div>
+        <script type="text/javascript">
+            // Copyright (c) 2020 Status Research & Development GmbH. Licensed under
+            // either of:
+            // - Apache License, version 2.0
+            // - MIT license
+            // at your option. This file may not be copied, modified, or distributed except
+            // according to those terms.
+
+            // "jsonData" is defined in "%BENCH_NAME%_d3.js"
+            var data = JSON.parse(jsonData);
+            // It's actually a group of benchmarks, so we need to process the
+            // data some more.
+            var benchmarks = {};
+            data.forEach(function(record, index){
+                for (var benchmarkName of d3.keys(record.data)) {
+                    if(!(benchmarkName in benchmarks)) {
+                        benchmarks[benchmarkName] = [];
+                    }
+                    benchmarks[benchmarkName].push({
+                        "timestamp": record.timestamp,
+                        "average": record.data[benchmarkName].average,
+                        "stddev": record.data[benchmarkName].stddev
+                    });
+                }
+            });
+            var container = d3.select("#chartContainer");
+            // TODO: Move all this into a function so it can be used to
+            // implement zoom functionality - have some interactive control to
+            // select a time range, then apply that window to our data, delete
+            // all charts and create them again. Too bad Dimple doesn't support
+            // this out of the box (D3 does, but is harder to use).
+            //
+            // We create one chart for each benchmark in the group, after
+            // sorting their names alphabetically.
+            d3.keys(benchmarks).sort(d3.ascending).forEach(function(benchmarkName, index){
+                container.append("h4").text(benchmarkName + " (95% CI)");
+                // TODO: dynamic chart size
+                var svg = dimple.newSvg("#chartContainer", 800, 600)
+                    .attr("style", "outline: thin solid #ccc;");
+                var myChart = new dimple.chart(svg, benchmarks[benchmarkName]);
+                // These margins should actually depend on label font sizes.
+                myChart.setMargins(60, 30, 10, 60);
+                var timestampFormat = "%Y-%m-%d-%H:%M:%S";
+                // Horizontal axis.
+                //
+                // We could display timestamp labels in a different format, if
+                // we wanted (last function argument).
+                var x = myChart.addTimeAxis("x", "timestamp", timestampFormat, timestampFormat);
+                x.title = "Time";
+                // Make sure there's some space to the left and right of our
+                // plot, inside the axes.
+                var timeParser = d3.timeParse(timestampFormat);
+                var minTime = timeParser(benchmarks[benchmarkName][0].timestamp).getTime();
+                var maxTime = timeParser(benchmarks[benchmarkName][benchmarks[benchmarkName].length - 1].timestamp).getTime();
+                var timeInterval = maxTime - minTime; // in milliseconds
+                // 5% on each side should be enough for everybody.
+                var timeMargin = timeInterval * 0.05;
+                if(timeMargin === 0) {
+                    // There's only one data point and it's overlapping the vertical axis.
+                    timeMargin = 60 * 1000; // 1 minute
+                }
+                x.overrideMin = new Date(minTime - timeMargin);
+                x.overrideMax = new Date(maxTime + timeMargin);
+
+                // Dimple doesn't give us a proper default tick density on a time Axis.
+                // Later edit: this produces intervals of varying lengths, sometimes. Too buggy to use.
+                //var ticks = 4;
+                //x.timePeriod = d3.timeMinute;
+                //x.timeInterval = (timeInterval + 2 * timeMargin) / 1000 / 60 / ticks;
+
+                // Vertical axis.
+                var y = myChart.addMeasureAxis("y", "average");
+                y.title = "Duration (ms)"
+                // D3 and Dimple make it very hard to attach metadata in a
+                // chart's series, so we're better off creating it the
+                // old-fashioned way.
+                var stddevs = [];
+                // We need to make room for the CI bars vertically.
+                var maxY = 0;
+                benchmarks[benchmarkName].forEach(function(benchmark, index){
+                    stddevs.push(benchmark.stddev);
+                    var combinedY = benchmark.average + (benchmark.stddev * 2);
+                    if(combinedY > maxY) {
+                        maxY = combinedY;
+                    }
+                });
+                y.overrideMax = maxY;
+                // This is where we bind our data, by creating a series that
+                // uses the first x and y axes by default.
+                var s = myChart.addSeries(null, dimple.plot.bar);
+                // We hook into chart element plotting to insert our CI bar.
+                s.afterDraw = function(pointShape, pointData){
+                    var shape = d3.select(pointShape);
+                    var stddev = stddevs.shift()
+                    // We show 4 standard deviations for a 95% confidence
+                    // interval (assuming this is a normal distribution).
+                    //
+                    // We need to scale chart values to pixel values, using a
+                    // private D3 method.
+                    //
+                    // Note that the SVG coordinate system has its origin at
+                    // the top left corner.
+                    var barHeightPx = myChart.axes[1]._scale(0) - myChart.axes[1]._scale(4 * stddev);
+                    // Probably the ugliest way to change part of the D3 data. Couldn't find a better one.
+                    // This new attribute will be used by the custom tooltip.
+                    shape._groups[0][0].__data__.stddev = stddev;
+                    // CI bar. Just a simple line.
+                    //
+                    // The chart's default bar width is 5 px. We might want to
+                    // change that dynamically in the future, which will affect
+                    // positioning here.
+                    svg.append("rect")
+                        .attr("x", parseFloat(shape.attr("x")) + 2.5)
+                        .attr("y", parseFloat(shape.attr("y")) - (barHeightPx / 2))
+                        .attr("height", barHeightPx)
+                        .attr("width", 0.1)
+                        .style("fill", "#000")
+                        .style("stroke", "#000")
+                        .style("opacity", 1)
+                        .style("pointer-events", "none");
+                };
+                // Custom tooltips.
+                s.getTooltipText = function(e){
+                    return ["date: " + d3.timeFormat(timestampFormat)(e.x),
+                        "duration: " + e.yValue + " ms",
+                        "stddev: " + e.stddev + " ms"];
+                };
+                // Make it so!
+                myChart.draw();
+            })
+        </script>
+    </body>
+</html>
