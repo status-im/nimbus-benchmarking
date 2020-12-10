@@ -1,8 +1,8 @@
-# helper scripts for NBC benchmarking
+# helper scripts for Nimbus-eth2 benchmarking
 
 process\_benchmark\_output.pl - takes NBC benchmark output and converts it into a
 JSON file suitable for the [Jenkins Benchmark
-plugin](https://plugins.jenkins.io/benchmark/).
+plugin](https://plugins.jenkins.io/benchmark/) or into HTML charts using D3 and Dimple.
 
 run\_nbc\_benchmarks.sh - builds and runs benchmarks, then calls process\_benchmark\_output.pl on their outputs.
 
