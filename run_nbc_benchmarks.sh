@@ -20,6 +20,17 @@ else
 	GETOPT_BINARY="getopt"
 fi
 
+if uname | grep -qiE "mingw|msys"; then
+  # Windows
+  MAKE_CMD=mingw32-make
+else
+  MAKE_CMD=make
+fi
+
+if [[ -z "${MAKE}" ]]; then
+  MAKE=${MAKE_CMD}
+fi
+
 # argument parsing
 ! ${GETOPT_BINARY} --test > /dev/null
 if [ ${PIPESTATUS[0]} != 4 ]; then
@@ -89,7 +100,7 @@ if [[ -f "research/state_sim.nim" ]]; then
 	BENCHMARKS+=( state_sim )
 fi
 
-make -j${NPROC} NIMFLAGS="-f" ${BENCHMARKS[*]}
+"${MAKE}" -j${NPROC} NIMFLAGS="-f" --no-print-directory ${BENCHMARKS[*]}
 
 if [[ ${OUTPUT_TYPE} == "jenkins" ]]; then
 	OUT_DIR="."
