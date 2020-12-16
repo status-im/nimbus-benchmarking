@@ -11,13 +11,13 @@ set -e
 
 # OS detection
 if uname | grep -qi darwin; then
-	# macOS
-	MAX_NPROC="$(sysctl -n hw.logicalcpu)"
-	GETOPT_BINARY="/usr/local/opt/gnu-getopt/bin/getopt"
-	[[ -f "$GETOPT_BINARY" ]] || { echo "GNU getopt not installed. Please run 'brew install gnu-getopt'. Aborting."; exit 1; }
+  # macOS
+  MAX_NPROC="$(sysctl -n hw.logicalcpu)"
+  GETOPT_BINARY="/usr/local/opt/gnu-getopt/bin/getopt"
+  [[ -f "$GETOPT_BINARY" ]] || { echo "GNU getopt not installed. Please run 'brew install gnu-getopt'. Aborting."; exit 1; }
 else
-	MAX_NPROC="$(nproc)"
-	GETOPT_BINARY="getopt"
+  MAX_NPROC="$(nproc)"
+  GETOPT_BINARY="getopt"
 fi
 
 if uname | grep -qiE "mingw|msys"; then
@@ -94,49 +94,50 @@ REL_PATH="$(dirname ${BASH_SOURCE[0]})"
 
 BENCHMARKS=()
 if [[ -f "research/block_sim.nim" ]]; then
-	BENCHMARKS+=( block_sim )
+  BENCHMARKS+=( block_sim )
 fi
 if [[ -f "research/state_sim.nim" ]]; then
-	BENCHMARKS+=( state_sim )
+  BENCHMARKS+=( state_sim )
 fi
 
 "${MAKE}" -j${NPROC} NIMFLAGS="-f" --no-print-directory ${BENCHMARKS[*]}
 
 if [[ ${OUTPUT_TYPE} == "jenkins" ]]; then
-	OUT_DIR="."
-	MSG=( "\nJenkins benchmark results generated." )
+  OUT_DIR="."
+  MSG=( "\nJenkins benchmark results generated." )
 elif [[ ${OUTPUT_TYPE} == "d3" ]]; then
-	OUT_DIR="benchmark_results"
-	MSG=( "\nYou can open the following URLs in your browser:" )
+  OUT_DIR="benchmark_results"
+  mkdir -p ${OUT_DIR}
+  MSG=( "\nYou can open the following URLs in your browser:" )
 fi
 
 for BENCH in ${BENCHMARKS[*]}; do
-	echo -n "Running ${BENCH} benchmarks..."
-	build/${BENCH} > "${OUT_DIR}/${BENCH}_out.txt"
-	echo
-	# process the benchmark results
-	if [[ ${OUTPUT_TYPE} == "jenkins" ]]; then
-		mkdir -p results/${BENCH}
-		${REL_PATH}/process_benchmark_output.pl \
-			--type ${BENCH} \
-			--infile "${OUT_DIR}/${BENCH}_out.txt" \
-			--output-type "${OUTPUT_TYPE}" \
-			--outfile results/${BENCH}/result.json
-	elif [[ ${OUTPUT_TYPE} == "d3" ]]; then
-		mkdir -p "${OUT_DIR}"
-		${REL_PATH}/process_benchmark_output.pl \
-			--type ${BENCH} \
-			--infile "${OUT_DIR}/${BENCH}_out.txt" \
-			--output-type "${OUTPUT_TYPE}" \
-			--outdir "${OUT_DIR}"
-		sed \
-			-e "s/%BENCH_NAME%/${BENCH}/g" \
-			${REL_PATH}/template.html > "${OUT_DIR}/${BENCH}.html"
-		MSG+=( "file://$(pwd)/${OUT_DIR}/${BENCH}.html" )
-	fi
+  echo -n "Running ${BENCH} benchmarks..."
+  build/${BENCH} > "${OUT_DIR}/${BENCH}_out.txt"
+  echo
+  # process the benchmark results
+  if [[ ${OUTPUT_TYPE} == "jenkins" ]]; then
+    mkdir -p results/${BENCH}
+    ${REL_PATH}/process_benchmark_output.pl \
+      --type ${BENCH} \
+      --infile "${OUT_DIR}/${BENCH}_out.txt" \
+      --output-type "${OUTPUT_TYPE}" \
+      --outfile results/${BENCH}/result.json
+  elif [[ ${OUTPUT_TYPE} == "d3" ]]; then
+    mkdir -p "${OUT_DIR}"
+    ${REL_PATH}/process_benchmark_output.pl \
+      --type ${BENCH} \
+      --infile "${OUT_DIR}/${BENCH}_out.txt" \
+      --output-type "${OUTPUT_TYPE}" \
+      --outdir "${OUT_DIR}"
+    sed \
+      -e "s/%BENCH_NAME%/${BENCH}/g" \
+      ${REL_PATH}/template.html > "${OUT_DIR}/${BENCH}.html"
+    MSG+=( "file://$(pwd)/${OUT_DIR}/${BENCH}.html" )
+  fi
 done
 
 for LINE in "${MSG[@]}"; do
-	echo -e "${LINE}"
+  echo -e "${LINE}"
 done
 
