@@ -63,7 +63,7 @@ if ($bench_type eq 'block_sim') {
     while (<$input_handle>) {
         # Strip both ends. Aren't hidden loop variables and default operator
         # arguments great?
-        s/^\s+|\s+$//;
+        s/^\s+|\s+$//g;
 
         $start_processing = 1 if /^Done!$/;
         next if not $start_processing;
@@ -111,7 +111,7 @@ if ($bench_type eq 'block_sim') {
     my $epoch_length = 0;
     while (<$input_handle>) {
         # Strip both ends.
-        s/^\s+|\s+$//;
+        s/^\s+|\s+$//g;
 
         $start_processing = 1 if /^:Done!$/;
         next if not $start_processing;
